@@ -1,0 +1,34 @@
+---
+const {slug}=Astro.props;
+---
+<section id="comments" data-slug={slug} style="margin-top:3rem"><h2>Comentarios</h2>
+<div id="form"></div><div id="list"></div></section>
+<script>
+import { sb } from '../lib/supabase';
+const root=document.getElementById('comments')!, slug=root.dataset.slug!;
+const list=document.getElementById('list')!, form=document.getElementById('form')!;
+let me:any=null, isAdmin=false;
+const el=(t:string,txt='',c='')=>{const e=document.createElement(t);e.textContent=txt;if(c)e.className=c;return e}; // textContent = sin XSS
+function box(parent:number|null,onDone:()=>void,initial='',id?:number){
+ const w=document.createElement('div');const ta=document.createElement('textarea');ta.maxLength=2000;ta.rows=3;ta.value=initial;
+ const b=el('button','Publicar','btn p');b.onclick=async()=>{const body=ta.value.trim();if(!body)return;b.disabled=true;
+  const r=id?await sb.from('comments').update({body,edited:true}).eq('id',id):await sb.from('comments').insert({post_slug:slug,body,parent_id:parent});
+  if(r.error)alert('No se pudo guardar (¿demasiado rápido?)');b.disabled=false;onDone()};
+ w.append(ta,b);return w}
+async function load(){
+ const{data:s}=await sb.auth.getSession();me=s.session?.user??null;
+ if(me){const{data:p}=await sb.from('profiles').select('is_admin').eq('id',me.id).single();isAdmin=!!p?.is_admin}
+ form.replaceChildren(me?box(null,load):el('p','Inicia sesión (botón "Entrar") para comentar.','mono'));
+ const{data}=await sb.from('comments_view').select('*').eq('post_slug',slug).order('created_at');
+ list.replaceChildren();const rows=data??[];
+ const render=(c:any,cls='')=>{const d=el('div','','cm '+cls);
+  d.append(el('b',c.author_name??'Anónimo'),el('span',' · '+new Date(c.created_at).toLocaleString()+(c.edited?' (editado)':''),'mono'),el('p',c.body));
+  const act=document.createElement('div');
+  if(me&&!c.parent_id){const r=el('button','Responder','tag');r.onclick=()=>{act.after(box(c.id,load))};act.append(r)}
+  if(me&&c.user_id===me.id){const e=el('button','Editar','tag');e.onclick=()=>{d.replaceWith(box(null,load,c.body,c.id))};act.append(e)}
+  if(me&&(c.user_id===me.id||isAdmin)){const x=el('button','Borrar','tag');x.onclick=async()=>{if(confirm('¿Borrar?')){await sb.from('comments').delete().eq('id',c.id);load()}};act.append(x)}
+  if(me&&c.user_id!==me.id){const x=el('button','Reportar','tag');x.onclick=async()=>{await sb.from('reports').insert({comment_id:c.id});x.textContent='Reportado'};act.append(x)}
+  d.append(act);return d};
+ rows.filter(c=>!c.parent_id).forEach(c=>{list.append(render(c));rows.filter(r=>r.parent_id===c.id).forEach(r=>list.append(render(r,'re')))})}
+sb.auth.onAuthStateChange(()=>{});load();
+</script>

@@ -1,0 +1,32 @@
+---
+import Base from '../layouts/Base.astro'; import { getCollection } from 'astro:content';
+const b=import.meta.env.BASE_URL.replace(/\/$/,'');
+const posts=(await getCollection('posts')).filter(p=>!p.data.draft).sort((a,c)=>+c.data.date-+a.data.date);
+const tags=[...new Set(posts.flatMap(p=>p.data.tags))].sort();
+const rt=(t:string)=>Math.max(1,Math.round(t.split(/\s+/).length/200));
+---
+<Base title="Mi Blog"><main class="wrap">
+<p class="mono" style="margin-top:2rem">$ ls contenido/ --sort=nuevo</p>
+<h1 style="font-size:2.4rem;margin:.2rem 0">Tecnología, IA agéntica e ingeniería de sistemas</h1>
+<input id="q" placeholder="buscar…" style="max-width:400px;margin:1rem 0">
+<div id="tags"><button class="tag on" data-t="">todos</button>{tags.map(t=><button class="tag" data-t={t}>{t}</button>)}</div>
+<div class="grid">{posts.map(p=>(
+<a class="card" href={`${b}/posts/${p.id}/`} data-s={(p.data.title+' '+p.data.summary+' '+p.data.tags.join(' ')).toLowerCase()} data-tags={p.data.tags.join('|')}>
+{p.data.cover?<img src={p.data.cover} alt="" loading="lazy">:<div class="ph" style="padding:0"></div>}
+<div><span class="mono">{p.data.tags[0]??'blog'} · {p.data.date.toISOString().slice(0,10)} · {rt(p.body??'')} min</span>
+<h3>{p.data.title}</h3><span class="mono">{p.data.summary}</span></div></a>))}</div>
+<section id="newsletter" style="border:1px solid var(--bd);padding:1.5rem;border-radius:8px;margin:2rem 0">
+<h2>Newsletter</h2><form id="sub" style="display:flex;gap:.5rem"><input type="email" id="em" required placeholder="tu@correo.com"><button class="btn p">Suscribirme</button></form><p class="mono" id="subm"></p></section>
+</main>
+<script>
+import { sb } from '../lib/supabase';
+let tag='';const cards=[...document.querySelectorAll<HTMLElement>('.card')];
+const f=()=>{const q=(document.getElementById('q') as HTMLInputElement).value.toLowerCase();
+ cards.forEach(c=>c.style.display=(c.dataset.s!.includes(q)&&(!tag||c.dataset.tags!.split('|').includes(tag)))?'':'none')};
+document.getElementById('q')!.oninput=f;
+document.querySelectorAll<HTMLElement>('#tags .tag').forEach(t=>t.onclick=()=>{tag=t.dataset.t!;document.querySelectorAll('#tags .tag').forEach(x=>x.classList.remove('on'));t.classList.add('on');f()});
+document.getElementById('sub')!.onsubmit=async e=>{e.preventDefault();
+ const email=(document.getElementById('em') as HTMLInputElement).value.trim().toLowerCase();
+ const{error}=await sb.from('subscribers').insert({email});
+ document.getElementById('subm')!.textContent=error?(error.code==='23505'?'Ya estabas suscrito.':'Error, intenta de nuevo.'):'¡Listo! Revisa tu correo para confirmar.'};
+</script></Base>

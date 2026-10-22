@@ -1,0 +1,14 @@
+---
+import Base from '../../layouts/Base.astro'; import Comments from '../../components/Comments.astro';
+import { getCollection, render } from 'astro:content';
+export async function getStaticPaths(){return (await getCollection('posts')).filter(p=>!p.data.draft).map(p=>({params:{slug:p.id},props:{p}}))}
+const {p}=Astro.props; const {Content,headings}=await render(p); const d=p.data;
+const b=import.meta.env.BASE_URL.replace(/\/$/,'');
+---
+<Base title={d.title}><main class="wrap" style="padding-top:2rem">
+<p class="mono"><a href={`${b}/`}>contenido</a> / {d.tags[0]??'blog'}</p>
+<div class="post"><article><h1 style="font-size:2.3rem;line-height:1.2">{d.title}</h1>
+<p class="mono">{d.summary}</p><p class="mono">Autor · {d.date.toISOString().slice(0,10)} · {d.tags.join(', ')}</p>
+{d.cover&&<img src={d.cover} alt="" style="width:100%;border-radius:8px">}
+<div class="prose"><Content/></div><Comments slug={p.id}/></article>
+<aside class="toc"><b class="mono">índice</b>{headings.filter(h=>h.depth<=3).map(h=><a href={`#${h.slug}`}>{h.text}</a>)}</aside></div></main></Base>
